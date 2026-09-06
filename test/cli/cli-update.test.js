@@ -284,6 +284,89 @@ test("--update rewrites destination-skewed occurrences independently and preserv
   assert.match(rewritten, /cdn\.jsdelivr\.net\/npm\/react@19\.3\.0\/\+esm/);
 });
 
+test("--update preserves URL-style keys pinned to specific versions and only rewrites values", async () => {
+  // URL keys with their own pinned versions are an intentional remap shape —
+  // they pin one specific version as the entry name and let the value float
+  // to whatever the CDN resolves. --update must keep the URL key byte-for-byte
+  // and only rewrite the value side, even when multiple keys skew the same
+  // package (react@19.0.0 and react@19.1.0 here both pointing at react@19.2.3).
+  const targetPath = await copyFixture("update-url-key-skew.html");
+  const result = await runCli(["--update", targetPath], {
+    env: { NO_COLOR: "1" },
+    registry: {
+      latest: {
+        react: "19.3.0",
+        "react-dom": "19.3.0",
+      },
+    },
+  });
+
+  assert.equal(result.code, 0);
+
+  const expected = `<!doctype html>
+<html>
+  <body>
+    <script type="importmap">
+      {
+        "imports": {
+          "https://cdn.jsdelivr.net/npm/react@19.0.0/": "https://cdn.jsdelivr.net/npm/react@19.3.0/",
+          "https://cdn.jsdelivr.net/npm/react@19.1.0/": "https://cdn.jsdelivr.net/npm/react@19.3.0/",
+          "https://cdn.jsdelivr.net/npm/react-dom@19.1.0/": "https://cdn.jsdelivr.net/npm/react-dom@19.3.0/"
+        }
+      }
+    </script>
+  </body>
+</html>
+`;
+
+  assert.strictEqual(await readFile(targetPath, "utf8"), expected);
+});
+
+test("--update preserves URL-style keys even when they share bytes with the rewritten value", async () => {
+  // Edge case: the key and value are byte-identical. The rewriter must still
+  // leave the key side alone and only lift the value to the new latest.
+  const dir = await createFixtureDir();
+  const targetPath = path.join(dir, "url-key-same.html");
+  const original = `<!doctype html>
+<html>
+  <body>
+    <script type="importmap">
+      {
+        "imports": {
+          "https://esm.sh/react@19.2.3": "https://esm.sh/react@19.2.3"
+        }
+      }
+    </script>
+  </body>
+</html>
+`;
+
+  await writeFile(targetPath, original);
+
+  const result = await runCli(["--update", targetPath], {
+    env: { NO_COLOR: "1" },
+  });
+
+  assert.equal(result.code, 0);
+
+  const expected = `<!doctype html>
+<html>
+  <body>
+    <script type="importmap">
+      {
+        "imports": {
+          "https://esm.sh/react@19.2.3": "https://esm.sh/react@19.3.0"
+        }
+      }
+    </script>
+  </body>
+</html>
+`;
+
+  // Key stays at 19.2.3; only the value side is rewritten.
+  assert.strictEqual(await readFile(targetPath, "utf8"), expected);
+});
+
 test("--update on a no-op fixture prints No changes to write and leaves the file unchanged", async () => {
   const targetPath = await copyFixture("update-noop.html");
   const original = await readFile(targetPath, "utf8");

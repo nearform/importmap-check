@@ -111,8 +111,13 @@ export const replaceDepsSpecifier = (url, packageName, newSpecifier) => {
 
 const rewriteDestinationUrls = (content, replacements) => {
   // Sort longer URLs first so a shorter URL substring never accidentally
-  // rewrites a longer URL's prefix. The surrounding-double-quote match
-  // ensures we only substitute whole import-map value boundaries.
+  // rewrites a longer URL's prefix. The `:\s*` lookbehind restricts each match
+  // to a JSON *value* slot — i.e. an import-map `"key": "value"` pair where the
+  // URL sits on the value side of the colon. URL keys with their own pinned
+  // version (e.g. `"https://esm.sh/react@19.1.0/": "https://esm.sh/react@19.2.3"`)
+  // share the value's URL bytes only when they happen to match exactly, and
+  // skipping them preserves the user's intentional pin while still rewriting
+  // the value side.
   const sorted = [...replacements]
     .filter(({ newUrl, oldUrl }) => newUrl !== oldUrl)
     .sort((left, right) => right.oldUrl.length - left.oldUrl.length);
@@ -120,9 +125,8 @@ const rewriteDestinationUrls = (content, replacements) => {
   let updated = content;
 
   for (const { newUrl, oldUrl } of sorted) {
-    const needle = `"${oldUrl}"`;
-    const replacement = `"${newUrl}"`;
-    updated = updated.split(needle).join(replacement);
+    const pattern = new RegExp(`(?<=:\\s*)"${escapeRegex(oldUrl)}"`, "g");
+    updated = updated.replace(pattern, `"${newUrl}"`);
   }
 
   return updated;

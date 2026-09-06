@@ -105,6 +105,21 @@ importmap-check preserves the specifier style you wrote. The exact rewrite depen
 
 Each rewrite preserves every other portion of the URL (CDN family, scoped package name, subpath, and non-`deps` query parameters). Updateable `?deps=` pins on the same URL are rewritten too — see **`?deps=` query pins are rewritten in place** below. Caret and tilde rewrites follow npm's semver locking rules: caret locks the leftmost non-zero element of `[major, minor, patch]`; tilde locks the position immediately left of the rightmost-specified position.
 
+### URL-style keys are preserved; only the value is rewritten
+
+Import map keys can be full URLs (the [import remap](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap#mapping_import_specifiers_as_URLs) shape), and `--update` treats them as intentional pins: the key side of `"<URL-key>": "<URL-value>"` is never rewritten, even when the key and value URL happen to be byte-identical. Only the value side is lifted to the new latest:
+
+```diff
+- "https://cdn.jsdelivr.net/npm/react@19.0.0/": "https://cdn.jsdelivr.net/npm/react@19.2.3/",
+- "https://cdn.jsdelivr.net/npm/react@19.1.0/": "https://cdn.jsdelivr.net/npm/react@19.2.3/",
+- "https://cdn.jsdelivr.net/npm/react-dom@19.1.0/": "https://cdn.jsdelivr.net/npm/react-dom@19.2.3/"
++ "https://cdn.jsdelivr.net/npm/react@19.0.0/": "https://cdn.jsdelivr.net/npm/react@19.3.0/",
++ "https://cdn.jsdelivr.net/npm/react@19.1.0/": "https://cdn.jsdelivr.net/npm/react@19.3.0/",
++ "https://cdn.jsdelivr.net/npm/react-dom@19.1.0/": "https://cdn.jsdelivr.net/npm/react-dom@19.3.0/"
+```
+
+The matching is scoped to value slots only: a URL is only rewritten when it sits on the right-hand side of a `:`, so URL keys that skew the same package (multiple keys pinning different versions) all keep their original bytes while their shared value floats to the new latest.
+
 ### Major-version-zero ranges
 
 Per npm's "0.x changes are breaking" rule, ranges on `0.x` packages lock the minor position (not the major):
