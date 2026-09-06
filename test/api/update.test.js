@@ -84,3 +84,30 @@ test("strips integrity entries tied to a rewritten URL", async () => {
   // The stale integrity key for the old URL is gone.
   assert.doesNotMatch(onDisk, /react@19\.2\.3/);
 });
+
+test("leaves URL-style keys untouched even when the value is rewritten", async () => {
+  // Remap-style URL keys with their own pinned versions are intentional:
+  // they name an exact import specifier and let the value float. The rewriter
+  // must rewrite only the value side and never touch the URL key bytes.
+  const file = await writeImportMap({
+    imports: {
+      "https://esm.sh/react@19.1.0/": "https://esm.sh/react@19.2.3",
+    },
+  });
+
+  const { data } = await runUpdate(file);
+
+  assert.equal(data.plan.noChanges, false);
+
+  const expected = `${JSON.stringify(
+    {
+      imports: {
+        "https://esm.sh/react@19.1.0/": "https://esm.sh/react@19.3.0",
+      },
+    },
+    null,
+    2,
+  )}\n`;
+
+  assert.strictEqual(await readFile(file, "utf8"), expected);
+});
