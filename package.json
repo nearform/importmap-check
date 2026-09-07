@@ -1,7 +1,7 @@
 {
   "name": "importmap-check",
   "private": false,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Check for updates to your ESM packages.",
   "license": "MIT",
   "author": "Ryan Roemer <ryan.roemer@nearform.com>",
