@@ -1,5 +1,11 @@
 # importmap-check
 
+## 0.1.1
+
+### Patch Changes
+
+- [#4](https://github.com/nearform/importmap-check/pull/4) [`8a39028`](https://github.com/nearform/importmap-check/commit/8a39028e68ea083ed8902bffce37a6d61e313926) - Preserve URL-style import map keys under `--update`. The rewriter now scopes each URL substitution to value slots only (the right-hand side of a `:`), so remap-style entries whose key is itself a pinned URL — including entries where multiple keys skew the same package at different versions — keep their original key bytes and only the value side floats to the new latest. This also covers the self-mapping case where the key and value URLs are byte-identical.
+
 ## 0.1.0
 
 ### Minor Changes
