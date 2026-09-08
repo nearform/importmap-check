@@ -137,3 +137,58 @@ test("reports up-to-date packages in the Current section", async () => {
     await currentRegistry.close();
   }
 });
+
+test("strips esm.sh leading `*` (external-deps marker) when parsing packages", async () => {
+  // esm.sh emits `*pkg@<version>` and `*@scope/pkg@<version>` URLs whose
+  // leading `*` marks every dependency as external; the `*` is a URL-level
+  // flag, not part of the package identity. Without the strip, the parser
+  // would surface `*pkg` as the package name (and `*` for the scoped form)
+  // and the registry lookup for `*` would 404.
+  const starRegistry = await startMockRegistry({
+    "preact-render-to-string": packument("preact-render-to-string", {
+      latest: "5.2.0",
+    }),
+    "@nearform/simple-firebase-auth-frontend": packument(
+      "@nearform/simple-firebase-auth-frontend",
+      { latest: "0.1.1" },
+    ),
+    react: packument("react", { latest: "19.3.0" }),
+  });
+
+  try {
+    const { data, output } = await check(fixture("esm-sh-star-prefix.html"), {
+      colorEnabled: false,
+      registryBaseUrl: starRegistry.url,
+    });
+
+    const preact = data.packageResults.find(
+      (r) => r.packageName === "preact-render-to-string",
+    );
+    const nearform = data.packageResults.find(
+      (r) => r.packageName === "@nearform/simple-firebase-auth-frontend",
+    );
+    const react = data.packageResults.find((r) => r.packageName === "react");
+
+    assert.ok(preact, "expected preact-render-to-string in packageResults");
+    assert.ok(nearform, "expected @nearform/simple-firebase-auth-frontend");
+    assert.ok(react, "expected react in packageResults");
+    assert.equal(preact.hasUpdate, false);
+    assert.equal(nearform.hasUpdate, false);
+    assert.equal(react.hasUpdate, true);
+
+    // No `*` artifact should leak into any package name, and the registry
+    // must not have been asked to resolve `*` (the original 404 trigger).
+    for (const result of data.packageResults) {
+      assert.ok(
+        !result.packageName.includes("*"),
+        `${result.packageName} unexpectedly contains '*'`,
+      );
+    }
+
+    assert.doesNotMatch(output, /Could not resolve specifier "nearform"/);
+    assert.doesNotMatch(output, /for package "\*"/);
+    assert.doesNotMatch(output, /Could not parse package identity and version/);
+  } finally {
+    await starRegistry.close();
+  }
+});

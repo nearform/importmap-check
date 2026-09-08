@@ -87,6 +87,8 @@ const parseEsmShPackage = (parsedUrl) => {
   //   - https://esm.sh/v<digits>/<pkg>@<version>/<subpath>  (build-mark prefix)
   //   - https://esm.sh/@scope/<pkg>@<version>/<subpath>
   //   - https://esm.sh/v<digits>/@scope/<pkg>@<version>/<subpath>
+  //   - https://esm.sh/*<pkg>@<version>          (* marks all deps as external)
+  //   - https://esm.sh/*@scope/<pkg>@<version>   (* marks all deps as external)
   const segments = parsedUrl.pathname.split("/").filter(Boolean);
 
   if (segments.length === 0) {
@@ -104,18 +106,28 @@ const parseEsmShPackage = (parsedUrl) => {
     return null;
   }
 
-  if (segments[startIndex].startsWith("@")) {
+  // esm.sh's leading `*` flag marks every dependency as external. It is a
+  // URL-level marker and is not part of the package identity, so it must be
+  // stripped before the scope-vs-unscoped decision is made; otherwise an
+  // unscoped `*<pkg>@<ver>` would surface a package name of `*<pkg>` and the
+  // scoped `*@scope/<pkg>@<ver>` form would mis-extract `*` as the package.
+  const packageSegment = segments[startIndex].startsWith("*")
+    ? segments[startIndex].slice(1)
+    : segments[startIndex];
+
+  if (!packageSegment) {
+    return null;
+  }
+
+  if (packageSegment.startsWith("@")) {
     if (segments.length <= startIndex + 1) {
       return null;
     }
 
-    return extractVersionedPackage(
-      segments[startIndex + 1],
-      segments[startIndex],
-    );
+    return extractVersionedPackage(segments[startIndex + 1], packageSegment);
   }
 
-  return extractVersionedPackage(segments[startIndex]);
+  return extractVersionedPackage(packageSegment);
 };
 
 export const parseSupportedPackageFromUrl = (value) => {
