@@ -1,5 +1,11 @@
 # importmap-check
 
+## 0.1.2
+
+### Patch Changes
+
+- [#6](https://github.com/nearform/importmap-check/pull/6) [`42ecadd`](https://github.com/nearform/importmap-check/commit/42ecaddcbafa8641cf44ca1f19f48a80e9e080a6) - Handle esm.sh's leading `*` (external-deps marker) when parsing package URLs. URLs like `https://esm.sh/*pkg@<version>` and `https://esm.sh/*@scope/pkg@<version>` now strip the `*` before scope-vs-unscoped resolution, so the package identity is recovered correctly and the registry lookup for `*` no longer 404s.
+
 ## 0.1.1
 
 ### Patch Changes
